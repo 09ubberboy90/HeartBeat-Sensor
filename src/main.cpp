@@ -4,29 +4,30 @@
 Serial pc(USBTX, USBRX);
 
 Max7219 max7219(PTD2, NC, PTD1, PTD0);
-char pattern_actual[17] ={};
+char pattern_actual[17] = {};
 char pattern_number[2][10][8] = {{{0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x81, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x40, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x9F, 0x91, 0xF1}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x81, 0x99, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x10, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xF1, 0x91, 0x9F}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x91, 0x9F}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x99, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xF1, 0x91, 0xFF}}, {{0xFF, 0x81, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x20, 0x40, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x9F, 0x91, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x81, 0x99, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xF0, 0x10, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xF1, 0x91, 0x9F, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xFF, 0x91, 0x9F, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x80, 0x80, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xFF, 0x99, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xF1, 0x91, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}}};
 char pattern_heart_deprecated[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x10};
-char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06}; 
+char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06};
 char pattern_flat[8] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
+static int BPM = 180;
 
 void pattern_to_display()
 {
-    for (int idx = 0; idx < 16; idx++)
+    for (int idx = 0; idx < sizeof(pattern_actual); idx++)
     {
-        if (idx<8) {
+        if (idx < 8)
+        {
             max7219.write_digit(2, idx + 1, pattern_actual[idx]);
         }
         else
         {
-            max7219.write_digit(1, (idx-8) + 1, pattern_actual[idx]);
+            max7219.write_digit(1, (idx - 8) + 1, pattern_actual[idx]);
         }
     }
 }
 
-
 //--------------------------------------------------------------------------------------------
-//Display a signal 
+//Display a signal
 void slider()
 {
     for (int u = 0; u < 16; u++)
@@ -45,10 +46,10 @@ void print_flat(int size)
         pattern_actual[16] = pattern_flat[0];
         slider();
         pattern_to_display();
-        wait_ms(100);
+        wait_ms((100 * 60) / BPM);
     }
 }
-void print_signal(int flat)
+void print_signal()
 {
     for (int i = 0; i < sizeof(pattern_heart); i++)
     {
@@ -56,16 +57,17 @@ void print_signal(int flat)
         slider();
         //TODO : maybe add a queue to remove the wait command
         pattern_to_display();
-        wait_ms(100);
+        wait_ms((100 * 60) / BPM);
     }
-    print_flat(flat);
+    print_flat(4);
 }
 
 //----------------------------------------------------------------------------------------
 //Number Processing
-void sum_num(int screen,char decimal[], char digit[])
+void sum_num(int screen, char decimal[], char digit[])
 {
-    if (screen == 1) {
+    if (screen == 1)
+    {
         for (int i = 0; i < 8; i++)
         {
             pattern_actual[i + 8] = decimal[i] + digit[i];
@@ -79,9 +81,9 @@ void sum_num(int screen,char decimal[], char digit[])
             pattern_actual[i] = decimal[i] + digit[i];
         }
     }
-    
 }
-void print_decimal(int screen, int number){
+void print_decimal(int screen, int number)
+{
     if (number < 10)
     {
         sum_num(screen, pattern_number[1][0], pattern_number[0][number]);
@@ -96,17 +98,18 @@ void print_decimal(int screen, int number){
 void print_number(int number)
 {
     pc.printf("number: %d\n", number);
-    if (number<100) {
-        print_decimal(1,number);
-        print_decimal(2,0);
+    if (number < 100)
+    {
+        print_decimal(1, number);
+        print_decimal(2, 0);
     }
     else
     {
-        int digit = number % 100%10;
-        int decimal = (number - digit)%100/10;
-        int centimal =(number - decimal)/100;
+        int digit = number % 100 % 10;
+        int decimal = (number - digit) % 100 / 10;
+        int centimal = (number - decimal) / 100;
         print_decimal(2, centimal);
-        sum_num(1,pattern_number[1][decimal], pattern_number[0][digit]);
+        sum_num(1, pattern_number[1][decimal], pattern_number[0][digit]);
         //Implement For second screen.
     }
     pattern_to_display();
@@ -120,8 +123,6 @@ void test()
         wait_ms(50);
     }
 }
-
-
 
 int main()
 {
@@ -143,11 +144,9 @@ int main()
 
     while (1)
     {
-        for(int i = 0; i < 20; i++)
+        for (int i = 0; i < 20; i++)
         {
-            print_signal(5);
+            print_signal();
         }
-        
-        
     }
 }
