@@ -1,119 +1,35 @@
-#include "mbed.h"
-/*
-example of driving maxim chip for Glasgow Uni Projects.
-
-Dr J.J.Trinder 2013,14
-jon.trinder@glasgow.ac.uk
-
- 
-*/
-
-#define max7219_reg_noop 0x00
-#define max7219_reg_digit0 0x01
-#define max7219_reg_digit1 0x02
-#define max7219_reg_digit2 0x03
-#define max7219_reg_digit3 0x04
-#define max7219_reg_digit4 0x05
-#define max7219_reg_digit5 0x06
-#define max7219_reg_digit6 0x07
-#define max7219_reg_digit7 0x08
-#define max7219_reg_decodeMode 0x09
-#define max7219_reg_intensity 0x0a
-#define max7219_reg_scanLimit 0x0b
-#define max7219_reg_shutdown 0x0c
-#define max7219_reg_displayTest 0x0f
-
-#define LOW 0
-#define HIGH 1
-
-#define NUMBER_OF_SCREENS 1
+#include <mbed.h>
+#include "max7219.h"
 
 Serial pc(USBTX, USBRX);
 
-SPI max72_spi(PTD2, NC, PTD1);
-DigitalOut load(PTD0); //will provide the load signal
-DigitalOut toto(LED1);
-AnalogIn ain(A0);
-
-Ticker printer;
-Ticker data;
-
-bool button = false;
-
-char pattern_actual[8 * NUMBER_OF_SCREENS+1] = {};
-char pattern_queue[16] = {};
-char pattern_diagonal[8] = {0x01, 0x2, 0x4, 0x08, 0x10, 0x20, 0x40, 0x80};
-char pattern_square[8] = {0xff, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff};
-char pattern_star[8] = {0x04, 0x15, 0x0e, 0x1f, 0x0e, 0x15, 0x04, 0x00};
-char pattern_letter_a[8] = {0x84, 0xC6, 0xA5, 0x84, 0x84, 0x84, 0x84, 0x84};
-char pattern_dead_man[8] = {0xa5, 0x42, 0xa5, 0x00, 0x18, 0x24, 0x42, 0x00};
-char pattern_all_on[8] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-char pattern_heart[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x10};
-
-char pattern_paolo[8] = {0x18, 0x24, 0x3C, 0x24, 0x24, 0xE7, 0x81, 0xFF}; // Paolo create the most beautiful design made in a 8*8 display
-
-//{0x18, 0x14, 0x12, 0x11, 0x10, 0x90, 0x50, 0x30};
-char pattern_flat[8] = {0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08};
-
+Max7219 max7219(PTD2, NC, PTD1, PTD0);
+char pattern_actual[17] ={};
 char pattern_number[2][10][8] = {{{0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x81, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x40, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x9F, 0x91, 0xF1}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x81, 0x99, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x10, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xF1, 0x91, 0x9F}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x91, 0x9F}, {0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x99, 0xFF}, {0x00, 0x00, 0x00, 0x00, 0x00, 0xF1, 0x91, 0xFF}}, {{0xFF, 0x81, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x20, 0x40, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x9F, 0x91, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x81, 0x99, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xF0, 0x10, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xF1, 0x91, 0x9F, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xFF, 0x91, 0x9F, 0x00, 0x00, 0x00, 0x00, 0x00}, {0x80, 0x80, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xFF, 0x99, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}, {0xF1, 0x91, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00}}};
-/*
-Write to the maxim via SPI
-args register and the column data
-*/
-void write_to_max(int reg, int col)
-{
-    load = LOW;           // begin
-    max72_spi.write(reg); // specify register
-    max72_spi.write(col); // put data
-    load = HIGH;          // make sure data is loaded (on rising edge of LOAD/CS)
-}
+char pattern_heart_deprecated[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x10};
+char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06}; 
+char pattern_flat[8] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
 
-void clear()
-{
-    for (int e = 1; e <= 8 * NUMBER_OF_SCREENS; e++)
-    { // empty registers, turn all LEDs off
-        write_to_max(e, 0);
-    }
-}
-
-//writes 8 bytes to the display
 void pattern_to_display()
 {
-    int cdata;
-    for (int idx = 0; idx < 8 * NUMBER_OF_SCREENS; idx++)
+    for (int idx = 0; idx < 16; idx++)
     {
-        cdata = pattern_actual[idx];
-        write_to_max(idx + 1, cdata);
+        if (idx<8) {
+            max7219.write_digit(2, idx + 1, pattern_actual[idx]);
+        }
+        else
+        {
+            max7219.write_digit(1, (idx-8) + 1, pattern_actual[idx]);
+        }
     }
 }
 
-void setup_dot_matrix()
-{
-    // initiation of the max 7219
-    // SPI setup: 8 bits, mode 0
-    max72_spi.format(8, 0);
 
-    max72_spi.frequency(100000); //down to 100khx easier to scope ;-)
-
-    write_to_max(max7219_reg_scanLimit, 0x07);
-    write_to_max(max7219_reg_decodeMode, 0x00);  // using an led matrix (not digits)
-    write_to_max(max7219_reg_shutdown, 0x01);    // not in shutdown mode
-    write_to_max(max7219_reg_displayTest, 0x00); // no display test
-    clear();                                     // clear the screen
-    // maxAll(max7219_reg_intensity, 0x0f & 0x0f);    // the first 0x0f is the value you can set
-    write_to_max(max7219_reg_intensity, 0x08);
-}
-
-void sum_num(char decimal[], char digit[])
-{
-    for (int i = 0; i < 8; i++)
-    {
-        pattern_actual[i] = decimal[i] + digit[i];
-    }
-}
+//--------------------------------------------------------------------------------------------
+//Display a signal 
 void slider()
 {
-    for (int u = 0; u < 8; u++)
+    for (int u = 0; u < 16; u++)
     {
         pattern_actual[u] = pattern_actual[u + 1];
     }
@@ -122,73 +38,116 @@ void slider()
 Print the heartbeat pattern
 TODO compress all 3 function into one with parameter
 */
-void print_flat()
+void print_flat(int size)
 {
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < size; i++)
     {
-        pattern_actual[8] = pattern_flat[i];
+        pattern_actual[16] = pattern_flat[0];
         slider();
         pattern_to_display();
-        wait_ms(200);
+        wait_ms(100);
     }
 }
-void print_signal()
+void print_signal(int flat)
 {
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < sizeof(pattern_heart); i++)
     {
-        pattern_actual[8] = pattern_heart[i];
+        pattern_actual[16] = pattern_heart[i];
         slider();
         //TODO : maybe add a queue to remove the wait command
         pattern_to_display();
-        wait_ms(200);
+        wait_ms(100);
     }
-    print_flat();
+    print_flat(flat);
 }
 
-
-/*
-Print a number between 0-99
-*/
-void print_number(int number)
+//----------------------------------------------------------------------------------------
+//Number Processing
+void sum_num(int screen,char decimal[], char digit[])
 {
+    if (screen == 1) {
+        for (int i = 0; i < 8; i++)
+        {
+            pattern_actual[i + 8] = decimal[i] + digit[i];
+        }
+    }
+    else if (screen == 2)
+    {
+
+        for (int i = 0; i < 8; i++)
+        {
+            pattern_actual[i] = decimal[i] + digit[i];
+        }
+    }
+    
+}
+void print_decimal(int screen, int number){
     if (number < 10)
     {
-        sum_num(pattern_number[1][0], pattern_number[0][number]);
+        sum_num(screen, pattern_number[1][0], pattern_number[0][number]);
     }
     else if (number < 100)
     {
         int digit = number % 10;
         int decimal = (number - digit) / 10;
-        sum_num(pattern_number[1][decimal], pattern_number[0][digit]);
+        sum_num(screen, pattern_number[1][decimal], pattern_number[0][digit]);
+    }
+}
+void print_number(int number)
+{
+    pc.printf("number: %d\n", number);
+    if (number<100) {
+        print_decimal(1,number);
+        print_decimal(2,0);
     }
     else
     {
+        int digit = number % 100%10;
+        int decimal = (number - digit)%100/10;
+        int centimal =(number - decimal)/100;
+        print_decimal(2, centimal);
+        sum_num(1,pattern_number[1][decimal], pattern_number[0][digit]);
         //Implement For second screen.
     }
     pattern_to_display();
 }
-
+//----------------------------------------------------------------------------------------------
 void test()
 {
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 200; i++)
     {
         print_number(i);
-        wait_ms(200);
+        wait_ms(50);
     }
 }
 
-void data_taken()
-{
-    pc.printf("0x%04X \n", ain.read_u16());
-}
+
+
 int main()
 {
-    setup_dot_matrix(); /* setup matric */
+    max7219.set_num_devices(2);
+    max7219_configuration_t cfg_1 = {
+        .device_number = 1,
+        .decode_mode = 0,
+        .intensity = Max7219::MAX7219_INTENSITY_8,
+        .scan_limit = Max7219::MAX7219_SCAN_8};
+    max7219_configuration_t cfg_2 = {
+        .device_number = 2,
+        .decode_mode = 0,
+        .intensity = Max7219::MAX7219_INTENSITY_8,
+        .scan_limit = Max7219::MAX7219_SCAN_8};
+
+    max7219.init_device(cfg_1);
+    max7219.init_device(cfg_2);
+    max7219.enable_display();
+
     while (1)
     {
-        toto = 1;
-        print_signal();
-        test();
-        clear();
+        for(int i = 0; i < 20; i++)
+        {
+            print_signal(5);
+        }
+        
+        
     }
 }
