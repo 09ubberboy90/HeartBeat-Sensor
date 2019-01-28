@@ -9,11 +9,14 @@ char pattern_number[2][10][8] = {{{0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x81, 0xF
 char pattern_heart_deprecated[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x10};
 char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06};
 char pattern_flat[8] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
-float waveform[20] = {};
+int waveform[20] = {};
 static int BPM = 60;
 Ticker timer;
 AnalogIn Ain(PTB2);
 int index12;
+Timer frequency;
+bool increase = true;
+bool decrease = false;
 //------------------------------------------------------------------------------------------------
 void pattern_to_display()
 {
@@ -132,16 +135,65 @@ void test()
     
 }
 //----------------------------------------------------------------------------------------------
+void timing()
+{
+    int prev_average = 0;
+    int next_average = 0;
+    int value = 0;
+    int counter = 2;
+    while(value<5){
+        int tmp = waveform[(index12 - counter) % 20];
+        if (tmp !=0)
+        {
+            value++;
+            prev_average+= tmp;
+        }
+        counter++;
+    }
+    prev_average /= 5;
+    value = 0;
+    counter = 0;
+    while (value < 5)
+    {
+        int tmp = waveform[(index12 - counter) % 20];
+        if (tmp != 0)
+        {
+            value++;
+            next_average += tmp;
+        }
+        counter++;
+    }
+    next_average/=5;
+
+    if (next_average > prev_average && decrease)
+    {
+        pc.printf("Timer : %f\n", frequency.read_ms());
+        frequency.stop();
+        frequency.reset();
+        pc.printf("Pulse\n");
+        decrease = false;
+        increase = true;
+    }
+    else if (next_average < prev_average && increase)
+    {
+        decrease = true;
+        increase = false;
+        frequency.start();
+    }
+        
+    
+}
 void flip()
 {
-    
-    waveform[index12] = Ain.read()*3.3;
     index12++;
-    if (index12>19) {
-        index12 = 0;
-    }
-    pc.printf("list:%f\n", waveform[index12-1]);
+    float tmp = Ain.read() * 330;
+    waveform[index12%20] = tmp ;
+
+    pc.printf("list:%d\n", waveform[index12%20]);
+    timing();
+    
 }
+
 int main()
 {
     max7219.set_num_devices(2);
@@ -162,7 +214,6 @@ int main()
     timer.attach(&flip, 0.1);
     while (1)
     {
-        print_signal();
-        pc.printf("list:%f\n", waveform[index12--]);
+        
     }
 }
