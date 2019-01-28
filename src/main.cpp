@@ -10,13 +10,15 @@ char pattern_heart_deprecated[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x
 char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06};
 char pattern_flat[8] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
 int waveform[20] = {};
-static int BPM = 60;
+int bpm = 60;
 Ticker timer;
 AnalogIn Ain(PTB2);
 int index12;
 Timer frequency;
 bool increase = true;
 bool decrease = false;
+float heartbeat_time;
+
 //------------------------------------------------------------------------------------------------
 void pattern_to_display()
 {
@@ -43,7 +45,7 @@ void slider()
     }
 }
 /*
-Print the heartbeat pattern
+Print the heartbeat_time pattern
 TODO compress all 3 function into one with parameter
 */
 void print_flat(int size)
@@ -53,7 +55,7 @@ void print_flat(int size)
         pattern_actual[16] = pattern_flat[0];
         slider();
         pattern_to_display();
-        wait_ms((100 * 60) / BPM);
+        wait_ms((100 * 60) / bpm);
     }
 }
 
@@ -65,7 +67,7 @@ void print_signal()
         slider();
         //TODO : maybe add a queue to remove the wait command
         pattern_to_display();
-        wait_ms((100 * 60) / BPM);
+        wait_ms((100 * 60) / bpm);
     }
     print_flat(4);
 }
@@ -137,11 +139,12 @@ void test()
 //----------------------------------------------------------------------------------------------
 void timing()
 {
+    int n = 3;
     int prev_average = 0;
     int next_average = 0;
     int value = 0;
     int counter = 2;
-    while(value<5){
+    while(value<n){
         int tmp = waveform[(index12 - counter) % 20];
         if (tmp !=0)
         {
@@ -150,10 +153,10 @@ void timing()
         }
         counter++;
     }
-    prev_average /= 5;
+    prev_average /= n;
     value = 0;
     counter = 0;
-    while (value < 5)
+    while (value < n)
     {
         int tmp = waveform[(index12 - counter) % 20];
         if (tmp != 0)
@@ -163,14 +166,16 @@ void timing()
         }
         counter++;
     }
-    next_average/=5;
+    next_average/=n;
 
     if (next_average > prev_average && decrease)
     {
-        pc.printf("Timer : %f\n", frequency.read_ms());
+        heartbeat_time = frequency.read();
         frequency.stop();
         frequency.reset();
-        pc.printf("Pulse\n");
+        pc.printf("Pulse : %f\n", heartbeat_time);
+        bpm = 60 / (heartbeat_time);
+        pc.printf("BPM : %d\n", bpm);
         decrease = false;
         increase = true;
     }
@@ -188,8 +193,7 @@ void flip()
     index12++;
     float tmp = Ain.read() * 330;
     waveform[index12%20] = tmp ;
-
-    pc.printf("list:%d\n", waveform[index12%20]);
+    pc.printf("List : %d\n",waveform[index12%20]);
     timing();
     
 }
@@ -215,5 +219,6 @@ int main()
     while (1)
     {
         
+        print_signal();
     }
 }
