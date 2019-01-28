@@ -9,8 +9,12 @@ char pattern_number[2][10][8] = {{{0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x81, 0xF
 char pattern_heart_deprecated[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x10};
 char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06};
 char pattern_flat[8] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
-static int BPM = 180;
-
+float waveform[20] = {};
+static int BPM = 60;
+Ticker timer;
+AnalogIn Ain(PTB2);
+int index12;
+//------------------------------------------------------------------------------------------------
 void pattern_to_display()
 {
     for (int idx = 0; idx < sizeof(pattern_actual); idx++)
@@ -49,6 +53,7 @@ void print_flat(int size)
         wait_ms((100 * 60) / BPM);
     }
 }
+
 void print_signal()
 {
     for (int i = 0; i < sizeof(pattern_heart); i++)
@@ -82,6 +87,7 @@ void sum_num(int screen, char decimal[], char digit[])
         }
     }
 }
+
 void print_decimal(int screen, int number)
 {
     if (number < 10)
@@ -95,9 +101,10 @@ void print_decimal(int screen, int number)
         sum_num(screen, pattern_number[1][decimal], pattern_number[0][digit]);
     }
 }
+
 void print_number(int number)
 {
-    pc.printf("number: %d\n", number);
+    //pc.printf("number: %d\n", number);
     if (number < 100)
     {
         print_decimal(1, number);
@@ -117,13 +124,24 @@ void print_number(int number)
 //----------------------------------------------------------------------------------------------
 void test()
 {
-    for (int i = 0; i < 200; i++)
+    for (int i = 0; i < 900; i++)
     {
-        print_number(i);
+        print_number(i*2);
         wait_ms(50);
     }
+    
 }
-
+//----------------------------------------------------------------------------------------------
+void flip()
+{
+    
+    waveform[index12] = Ain.read()*3.3;
+    index12++;
+    if (index12>19) {
+        index12 = 0;
+    }
+    pc.printf("list:%f\n", waveform[index12-1]);
+}
 int main()
 {
     max7219.set_num_devices(2);
@@ -141,12 +159,10 @@ int main()
     max7219.init_device(cfg_1);
     max7219.init_device(cfg_2);
     max7219.enable_display();
-
+    timer.attach(&flip, 0.1);
     while (1)
     {
-        for (int i = 0; i < 20; i++)
-        {
-            print_signal();
-        }
+        print_signal();
+        pc.printf("list:%f\n", waveform[index12--]);
     }
 }
