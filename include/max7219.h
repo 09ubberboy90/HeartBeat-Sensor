@@ -166,21 +166,6 @@ class Max7219
     /**********************************************************/ /**
     * @brief Constructor for Max7219 Class.  
     * 
-    * @details Allows user to pass pointer to existing SPI bus
-    *
-    * On Entry:
-    *     @param[in] spi_bus - pointer to existing SPI object
-    *     @param[in] cs - pin to use for cs
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    Max7219(SPI *spi_bus, PinName cs);
-
-    /**********************************************************/ /**
-    * @brief Constructor for Max7219 Class.  
-    * 
     * @details Allows user to specify SPI peripheral to use
     *
     * On Entry:
@@ -195,18 +180,6 @@ class Max7219
     **************************************************************/
     Max7219(PinName mosi, PinName miso, PinName sclk, PinName cs);
 
-    /**********************************************************/ /**
-    * @brief Default destructor for Max7219 Class.  
-    *
-    * @details Destroys SPI object if owner 
-    *
-    * On Entry:
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    ~Max7219();
 
     /**********************************************************/ /**
     * @brief Sets the number of MAX7219 devices being used.
@@ -223,32 +196,6 @@ class Max7219
     * @return Returns number of devices
     **************************************************************/
     int32_t set_num_devices(uint8_t num_devices);
-
-    /**********************************************************/ /**
-    * @brief Tests all devices being used 
-    *
-    * @details Sets bit0 of DISPLAY_TEST regiser in all devices
-    *
-    * On Entry:
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    void set_display_test(void);
-
-    /**********************************************************/ /**
-    * @brief Stops test
-    *
-    * @details Clear bit0 of DISPLAY_TEST regiser in all devices
-    *
-    * On Entry:
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    void clear_display_test(void);
 
     /**********************************************************/ /**
     * @brief Initializes specific device in display with given 
@@ -269,36 +216,6 @@ class Max7219
     int32_t init_device(max7219_configuration_t config);
 
     /**********************************************************/ /**
-    * @brief Initializes all devices with given config data
-    *
-    * @details All devices are configured with given data
-    *
-    * On Entry:
-    *     @param[in] config - Structure containing configuration 
-    *                         data
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    void init_display(max7219_configuration_t config);
-
-    /**********************************************************/ /**
-    * @brief Enables specific device in display
-    *
-    * @details 
-    *
-    * On Entry:
-    *     @param[in] device_number - device to enable
-    *
-    * On Exit:
-    *
-    * @return Returns  0 on success\n 
-    *         Returns -1 if device number is > _num_devices\n
-    *         Returns -2 if device number is 0\n
-    **************************************************************/
-    int32_t enable_device(uint8_t device_number);
-
-    /**********************************************************/ /**
     * @brief Enables all device in display 
     *
     * @details 
@@ -310,34 +227,6 @@ class Max7219
     * @return None
     **************************************************************/
     void enable_display(void);
-
-    /**********************************************************/ /**
-    * @brief Disables specific device in display
-    *
-    * @details 
-    *
-    * On Entry:
-    *     @param[in] device_number - device to disable
-    *
-    * On Exit:
-    *    @return Returns  0 on success\n 
-    *            Returns -1 if device number is > _num_devices\n
-    *            Returns -2 if device number is 0\n
-    **************************************************************/
-    int32_t disable_device(uint8_t device_number);
-
-    /**********************************************************/ /**
-    * @brief Disables all devices in display
-    *
-    * @details 
-    *
-    * On Entry:
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    void disable_display(void);
 
     /**********************************************************/ /**
     * @brief Writes digit of given device with given data, user
@@ -359,83 +248,6 @@ class Max7219
     *         Returns -4 if digit < 1\n
     **************************************************************/
     int32_t write_digit(uint8_t device_number, uint8_t digit, uint8_t data);
-
-    /**********************************************************/ /**
-    * @brief Clears digit of given device
-    *
-    * @details 
-    *
-    * On Entry:
-    *     @param[in] device_number - device to write too
-    *     @param[in] digit - digit to clear
-    *
-    * On Exit:
-    *
-    * @return Returns  0 on success\n 
-    *         Returns -1 if device number is > _num_devices\n
-    *         Returns -2 if device number is 0\n
-    *         Returns -3 if digit > 8\n
-    *         Returns -4 if digit < 1\n
-    **************************************************************/
-    int32_t clear_digit(uint8_t device_number, uint8_t digit);
-
-    /**********************************************************/ /**
-    * @brief Turns on all segments/digits of given device
-    *
-    * @details 
-    *
-    * On Entry:
-    *     @param[in] device_number - device to write too
-    *
-    * On Exit:
-    *
-    * @return Returns  0 on success\n 
-    *         Returns -1 if device number is > _num_devices\n
-    *         Returns -2 if device number is 0\n
-    **************************************************************/
-    int32_t device_all_on(uint8_t device_number);
-
-    /**********************************************************/ /**
-    * @brief Turns off all segments/digits of given device
-    *
-    * @details 
-    *
-    * On Entry:
-    *     @param[in] device_number - device to write too
-    *
-    * On Exit:
-    *
-    * @return Returns 0 on success\n 
-    *         Returns -1 if device number is > _num_devices\n
-    *         Returns -2 if device number is 0\n
-    **************************************************************/
-    int32_t device_all_off(uint8_t device_number);
-
-    /**********************************************************/ /**
-    * @brief Turns on all segments/digits of display
-    *
-    * @details 
-    *
-    * On Entry:
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    void display_all_on(void);
-
-    /**********************************************************/ /**
-    * @brief Turns off all segments/digits of display
-    *
-    * @details 
-    *
-    * On Entry:
-    *
-    * On Exit:
-    *
-    * @return None
-    **************************************************************/
-    void display_all_off(void);
 
   private:
     SPI *_p_spi;
