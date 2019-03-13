@@ -10,14 +10,20 @@ char pattern_heart_deprecated[8] = {0x04, 0x02, 0x01, 0xFF, 0x80, 0x40, 0x20, 0x
 char pattern_heart[6] = {0x38, 0xC0, 0x38, 0x06, 0x01, 0x06};
 char pattern_flat[8] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04};
 int waveform[20] = {};
-int bpm = 60;
+int bpm = 0;
+int bpmList[3] = {}; 
 Ticker timer;
-AnalogIn Ain(PTB2);
+AnalogIn Ain(PTB1);
+DigitalOut led(PTD4);
 int index12;
+int timeOut;
 Timer frequency;
 bool increase = true;
+bool pattern_detected = false;
 bool decrease = false;
+bool state = false;
 float heartbeat_time;
+InterruptIn button(PTD5);
 
 //------------------------------------------------------------------------------------------------
 void pattern_to_display()
@@ -109,8 +115,7 @@ void print_decimal(int screen, int number)
 
 void print_number(int number)
 {
-    //pc.printf("number: %d\n", number);
-    if (number < 100)
+    if (number < 100) //only one screen use so print 0 on the second screen
     {
         print_decimal(1, number);
         print_decimal(2, 0);
@@ -121,32 +126,24 @@ void print_number(int number)
         int decimal = (number - digit) % 100 / 10;
         int centimal = (number - decimal) / 100;
         print_decimal(2, centimal);
-        sum_num(1, pattern_number[1][decimal], pattern_number[0][digit]);
-        //Implement For second screen.
+        sum_num(1, pattern_number[1][decimal], pattern_number[0][digit]); //Print on second screen
     }
     pattern_to_display();
 }
 //----------------------------------------------------------------------------------------------
-void test()
-{
-    for (int i = 0; i < 900; i++)
-    {
-        print_number(i*2);
-        wait_ms(50);
-    }
-    
-}
-//----------------------------------------------------------------------------------------------
+
+
 void timing()
 {
-    int n = 3;
+    const int n = 1;
     int prev_average = 0;
     int next_average = 0;
+    //Averages previous value if needed base on n;
     int value = 0;
     int counter = 2;
     while(value<n){
         int tmp = waveform[(index12 - counter) % 20];
-        if (tmp !=0)
+        if (true) ///tmp !=0
         {
             value++;
             prev_average+= tmp;
@@ -159,7 +156,7 @@ void timing()
     while (value < n)
     {
         int tmp = waveform[(index12 - counter) % 20];
-        if (tmp != 0)
+        if (true) //tmp !=0
         {
             value++;
             next_average += tmp;
@@ -168,14 +165,13 @@ void timing()
     }
     next_average/=n;
 
+    //Check for a pattern
     if (next_average > prev_average && decrease)
     {
         heartbeat_time = frequency.read();
         frequency.stop();
         frequency.reset();
-        pc.printf("Pulse : %f\n", heartbeat_time);
-        bpm = 60 / (heartbeat_time);
-        pc.printf("BPM : %d\n", bpm);
+        pattern_detected = true;
         decrease = false;
         increase = true;
     }
@@ -185,19 +181,71 @@ void timing()
         increase = false;
         frequency.start();
     }
-        
+    else
+    {
+        pattern_detected = false;
+    }
     
+
+}
+void bpmHandler(int counter)
+{
+    if (pattern_detected)
+    {
+        pc.printf("Pulse : %f\n", 2 / heartbeat_time);
+        bpmList[index12 % 2] = 60 / (heartbeat_time) / 2;
+        // Averages the Bpm
+        int sumBpm = 0;
+        int value = 0;
+        for (int i = 0; i < 2; i++)
+        {
+            if (bpmList[i] != 0)
+            {
+                sumBpm += bpmList[i];
+                value++;
+            }
+        }
+        led = !led;
+        if (value != 0)
+        {
+            bpm = sumBpm / value;
+        }
+        else
+        {
+            bpm = 0;
+        }
+        pc.printf("BPM : %d\n", bpm);
+    }
+    else
+    {
+        if (counter >= 8) {
+            led=0;
+            bpm=0;
+        }
+    }
 }
 void flip()
 {
     index12++;
-    float tmp = Ain.read() * 330;
-    waveform[index12%20] = tmp ;
-    pc.printf("List : %d\n",waveform[index12%20]);
+    float tmp = Ain.read();
+    waveform[index12%20] = tmp *330;
+    if (!pattern_detected) {
+        timeOut++;
+    }
+    else {
+        timeOut=0;
+    }
+    
+    bpmHandler(timeOut);
     timing();
     
 }
-
+void function_change()
+{
+    state = !state;
+    pc.printf("State : ");
+    pc.printf("%s\n", state ? "true" : "false");
+}
 int main()
 {
     max7219.set_num_devices(2);
@@ -216,9 +264,32 @@ int main()
     max7219.init_device(cfg_2);
     max7219.enable_display();
     timer.attach(&flip, 0.1);
+    pc.printf("Program Initialized");
+    button.mode(PullUp);
+    wait(.01);
     while (1)
     {
-        
-        print_signal();
+        // Use that to test button need to actually set the right pin since i dont know which on it's attached to
+        button.fall(&function_change);
+        if (state)
+        {
+            if (bpm != 0)
+            {
+                print_signal();
+            }
+            else
+            {
+                print_flat(5);
+            }
+        }
+        else
+        {
+            print_number(bpm);
+        }
+
+        // USe that to print a counter of number
+
+        // Use that to print the actual signal
     }
+
 }
