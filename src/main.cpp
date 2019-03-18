@@ -16,12 +16,17 @@ Ticker timer;
 Timer frequency;
 AnalogIn Ain(PTB1);
 int waveform[20] = {};
+int value[40] = {};
 int bpm = 0;
-int bpmList[3] = {};
+int bpmList[10] = {};
 int index12;
 int timeOut;
 int prev_average;
 int next_average;
+
+int maxVal = 0;
+int minVal = INT_MAX;
+int middle;
 
 float heartbeat_time;
 
@@ -29,6 +34,7 @@ bool increase = true;
 bool pattern_detected = false;
 bool decrease = false;
 bool state = false;
+bool stable = false;
 
 InterruptIn button(PTD5);
 DigitalOut led(PTD4);
@@ -38,7 +44,7 @@ DigitalOut led(PTD4);
 void pattern_to_display()
 {
     // For each of the hex code in patternactual 
-    for (int idx = 0; idx < sizeof(pattern_actual); idx++)
+    for (int idx = 0; idx < sizeof(pattern_actual)-1; idx++)
     {
         // print the first 8 to the first screen 
         if (idx < 8)
@@ -159,66 +165,40 @@ void print_number(int number)
 //----------------------------------------------------------------------------------------------
 //Handler for the Heartbeat
 
-// averages out the signal if there is ever a need to 
-// takes the curent value-number and the current value and go down the history until n is reached
-// then average number value and set the previous and next value as the result.
-void averaged(int number)
-{
-    prev_average = 0;
-    next_average = 0;
-    //Averages previous value if needed base on number;
-    int value = 0;
-    int counter = number;
-    while (value < number)
-    {
-        //circular loop using modulo
-        int tmp = waveform[(index12 - counter) % 20];
-        value++;
-        prev_average += tmp;
-        counter++;
-    }
-    prev_average /= number;
 
-    //Averages the current value if needed base on number;
-    value = 0;
-    counter = 0;
-    while (value < number)
-    {
-        int tmp = waveform[(index12 - counter) % 20];
-        value++;
-        next_average += tmp;
-        counter++;
-    }
-    next_average /= number;
-}
-
-// Check for a pattern( a rising edge follow by a falling edge and nothing else)
-void timing()
+// time the time between every time the wave goes above the threshold(cuttof)
+// the cuttof is 85% of the range * 1000 to ignore small changes in heartbeat
+void timing(int range)
 {
-    //no need for average in this case so only 1
-    averaged(1);
-    // rising edge
-    if (next_average > prev_average && decrease)
+    float cutoff = range * 8500;
+    // get the value as a difference to the median *10000 to once again ignore small changes
+    float recorded = (middle - value[index12 % 40]) * 10000;
+    // value is above the threshold
+    if (recorded >= cutoff)
     {
-        // set the timer base on the time since the falling edge
         heartbeat_time = frequency.read();
-        frequency.stop();
-        frequency.reset();
-        //bool to handle the display and the edges switch
-        pattern_detected = true;
-        decrease = false;
-        increase = true;
-    }
-    else if (next_average < prev_average && increase)
-    {
-        //start a timer
-        decrease = true;
-        increase = false;
-        frequency.start();
+        // only detect it once in case the wave stay above the throshod for more than one cycle.
+        // if it does the timing bewteen the 2 would be really small and hence can be discarded
+        // only calculate if the difference is bigger that 10^-2
+        if (heartbeat_time * 100 != 0)
+        {
+            // turn on the led when its above and off when below
+            led = 1;
+            frequency.stop();
+            frequency.reset();
+            pattern_detected = true;
+            pc.printf("HeartBeatTime : %f\n", heartbeat_time);
+        }
+        else
+        {
+            pattern_detected = false;
+        }
     }
     else
     {
         pattern_detected = false;
+        frequency.start();
+        led = 0;
     }
 }
 // Do the calculation for the heartbeat if a pattern was detected
@@ -228,10 +208,16 @@ void bpmHandler(int counter)
     if (pattern_detected)
     {
         // circular list of only size 2 to then average the bpm to remove some garbage reading
-        bpmList[index12 % 2] = 60 / (heartbeat_time) / 2;
+        int tmpBpm = 60 / (heartbeat_time) / 2;
+        if (40<tmpBpm && tmpBpm<200) {
+            bpmList[index12 % 10] = tmpBpm;
+        }
+        
+        pc.printf("bpm : %d\n", bpmList[index12 % 10]);
+
         int sumBpm = 0;
         int value = 0;
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 10; i++)
         {
             if (bpmList[i] != 0)
             {
@@ -241,7 +227,8 @@ void bpmHandler(int counter)
         }
         // Alternate the Led every tme a pattern is detected
         led = !led;
-        //Makes sure to not divides by 0!!!
+
+        // Makes sure to not divides by 0!!!
         if (value != 0)
         {
             bpm = sumBpm / value;
@@ -250,12 +237,16 @@ void bpmHandler(int counter)
         {
             bpm = 0;
         }
+        if (bpm>=200) {
+            bpm = 0;
+        }
+        
         pc.printf("BPM : %d\n", bpm);
     }
     else
     {   
         // reset the Led and the bpm counter
-        if (counter >= 10)
+        if (counter >= 25)
         {
             led = 0;
             bpm = 0;
@@ -264,25 +255,61 @@ void bpmHandler(int counter)
 }
 
 // Interupt function
-// Store the recorded value as a 3.30 voltage with no floating point to make calculation faster in a circular list of 20 value 
+// Store the recorded value as a 3.30 voltage with no floating point(hence the *1000) to make calculation faster in a circular list of 40 value 
 void flip()
 {
     index12++;
-    float tmp = Ain.read();
-    waveform[index12 % 20] = tmp * 330;
-    // start a timeout when no pattern is detected
-    if (!pattern_detected)
+    value[index12 % 40] = Ain.read() * 33000;
+    //Discard value that are too high or too low
+    if (10000 < value[index12 % 40] && value[index12 % 40] < 20000)
     {
-        timeOut++;
+        // loop through the list to find the min and max value
+        minVal = INT_MAX;
+        maxVal = 0;
+        for (int i = 0; i < 40; i++)
+        {
+            int tmp = value[i];
+            if (tmp < minVal)
+            {
+                minVal = tmp;
+            }
+            else if (tmp > maxVal)
+            {
+                maxVal = tmp;
+            }
+        }
+        //find the middle and the range
+        middle = (maxVal + minVal) / 2;
+        int range = (maxVal - minVal) / 2;
+        // ignore small changes in value
+        if (range > 20) {
+            timing(range);
+        }
+        if (!pattern_detected)
+        {
+            //start/ increase the timeout
+            timeOut++;
+        }
+        else
+        {
+            // reset the timeout
+            timeOut = 0;
+        }
+        bpmHandler(timeOut);
+
     }
     else
     {
-        // reset the timeout
-        timeOut = 0;
+        // reset everything
+        led = 0;
+        bpm = 0;
+        minVal = INT_MAX;
+        maxVal = 0;
+        pattern_detected = false;
     }
-
-    bpmHandler(timeOut);
-    timing();
+    
+    
+   
 }
 
 // button fuunction to change the state 
@@ -313,17 +340,19 @@ int main()
     max7219.init_device(cfg_2);
     max7219.enable_display();
     // attach the recorder in an interupt called every .1 seconds
-    timer.attach(&flip, 0.1);
+    timer.attach(&flip, 0.02);
     pc.printf("Program Initialized");
+    button.fall(&function_change);
+
     while (1)
     {
         // record the changing of the button
-        button.fall(&function_change);
         // switch depending on the state of the button
         if (state)
         {
             // if there is a beat print a pattern otherwise just print a flatline
-            if (bpm != 0)
+            // Also dont print beat otther 200 we assume its never going to happen
+            if (bpm != 0 && bpm<200)
             {
                 print_signal();
             }
